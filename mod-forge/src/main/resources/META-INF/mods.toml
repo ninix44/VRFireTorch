@@ -6,7 +6,7 @@ license = "MIT"
 modId = "firetorch"
 version = "${version}"
 displayName = "VisorFireTorch"
-authors = "PhoenixRa"
+authors = "Ninix"
 displayTest = "NONE"
 description = '''
 The FireTorch Addon for Visor
