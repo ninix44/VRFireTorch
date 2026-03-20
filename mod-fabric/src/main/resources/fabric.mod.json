@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "visor_example",
+  "id": "firetorch",
   "version": "${version}",
 
-  "name": "VisorExample",
-  "description": "The Example Addon for Visor",
+  "name": "VisorFireTorch",
+  "description": "The FireTorch Addon for Visor",
   "authors": [
     "PhoenixRa"
   ],
@@ -12,7 +12,7 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "your.mod.example.fabric.ExampleMod"
+      "org.vmstudio.firetorch.fabric.FireTorchMod"
     ]
   },
   "mixins": [

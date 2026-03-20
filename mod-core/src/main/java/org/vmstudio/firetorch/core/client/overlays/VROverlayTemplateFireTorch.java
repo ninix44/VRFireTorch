@@ -1,4 +1,4 @@
-package your.mod.example.core.client.overlays;
+package org.vmstudio.firetorch.core.client.overlays;
 
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import org.vmstudio.visor.api.client.gui.overlays.RegisterVROverlayTemplate;
@@ -15,18 +15,18 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 
 @RegisterVROverlayTemplate(
-        id = VROverlayTemplateExample.ID,
-        name = VROverlayTemplateExample.NAME,
-        description = VROverlayTemplateExample.DESCRIPTION
+        id = VROverlayTemplateFireTorch.ID,
+        name = VROverlayTemplateFireTorch.NAME,
+        description = VROverlayTemplateFireTorch.DESCRIPTION
 )
-public class VROverlayTemplateExample extends VROverlayTemplateScreen {
-    public static final String ID = "template_example";
-    public static final String NAME = "Example template";
-    public static final String DESCRIPTION = "Example description";
+public class VROverlayTemplateFireTorch extends VROverlayTemplateScreen {
+    public static final String ID = "firetorch_template";
+    public static final String NAME = "FireTorch template";
+    public static final String DESCRIPTION = "FireTorch overlay template";
 
-    private final Component text = Component.literal("Template Overlay Example");
+    private final Component text = Component.literal("FireTorch Template Overlay");
 
-    public VROverlayTemplateExample(@NotNull VisorAddon owner, @NotNull String id) {
+    public VROverlayTemplateFireTorch(@NotNull VisorAddon owner, @NotNull String id) {
         super(owner, id);
         //if you want it to be enabled once created
         setEnabled(true);

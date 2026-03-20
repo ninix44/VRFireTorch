@@ -1,25 +1,25 @@
-package your.mod.example.core.client;
+package org.vmstudio.firetorch.core.client;
 
 import org.vmstudio.visor.api.VisorAPI;
 import org.vmstudio.visor.api.common.addon.VisorAddon;
-import your.mod.example.core.client.overlays.VROverlayExample;
-import your.mod.example.core.common.VisorExample;
+import org.vmstudio.firetorch.core.client.overlays.VROverlayFireTorch;
+import org.vmstudio.firetorch.core.common.VisorFireTorch;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-public class ExampleAddonClient implements VisorAddon {
+public class FireTorchAddonClient implements VisorAddon {
     @Override
     public void onAddonLoad() {
         VisorAPI.addonManager().getRegistries()
                 .overlays()
                 .registerComponents(
                         List.of(
-                                new VROverlayExample(
+                                new VROverlayFireTorch(
                                         this,
-                                        VROverlayExample.ID
+                                        VROverlayFireTorch.ID
                                 )
                         )
                 );
@@ -27,19 +27,19 @@ public class ExampleAddonClient implements VisorAddon {
 
     @Override
     public @Nullable String getAddonPackagePath() {
-        return "your.mod.example.core.client";
+        return "org.vmstudio.firetorch.core.client";
     }
 
     @Override
     public @NotNull String getAddonId() {
-        return VisorExample.MOD_ID;
+        return VisorFireTorch.MOD_ID;
     }
     @Override
     public @NotNull Component getAddonName() {
-        return Component.literal(VisorExample.MOD_NAME);
+        return Component.literal(VisorFireTorch.MOD_NAME);
     }
     @Override
     public String getModId() {
-        return VisorExample.MOD_ID;
+        return VisorFireTorch.MOD_ID;
     }
 }

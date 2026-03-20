@@ -3,31 +3,31 @@ loaderVersion = "[46,)"
 license = "MIT"
 
 [[mods]]
-modId = "visor_example"
+modId = "firetorch"
 version = "${version}"
-displayName = "VisorExample"
+displayName = "VisorFireTorch"
 authors = "PhoenixRa"
 displayTest = "NONE"
 description = '''
-The Example Addon for Visor
+The FireTorch Addon for Visor
 
 '''
 
-[[dependencies.visor_example]]
+[[dependencies.firetorch]]
 modId = "visor"
 mandatory = true
 versionRange = "[0.2.0-alpha,)"
 ordering = "AFTER"
 side = "BOTH"
 
-[[dependencies.visor_example]]
+[[dependencies.firetorch]]
 modId = "forge"
 mandatory = true
 versionRange = "[46,)"
 ordering = "AFTER"
 side = "BOTH"
 
-[[dependencies.visor_example]]
+[[dependencies.firetorch]]
 modId = "minecraft"
 mandatory = true
 versionRange = "[1.20,1.20.1]"

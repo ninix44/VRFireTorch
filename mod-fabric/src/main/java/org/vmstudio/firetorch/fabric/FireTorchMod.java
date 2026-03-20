@@ -1,21 +1,21 @@
-package your.mod.example.fabric;
+package org.vmstudio.firetorch.fabric;
 
 import org.vmstudio.visor.api.ModLoader;
 import org.vmstudio.visor.api.VisorAPI;
-import your.mod.example.core.client.ExampleAddonClient;
-import your.mod.example.core.server.ExampleAddonServer;
+import org.vmstudio.firetorch.core.client.FireTorchAddonClient;
+import org.vmstudio.firetorch.core.server.FireTorchAddonServer;
 import net.fabricmc.api.ModInitializer;
 
-public class ExampleMod implements ModInitializer {
+public class FireTorchMod implements ModInitializer {
     @Override
     public void onInitialize() {
         if(ModLoader.get().isDedicatedServer()){
             VisorAPI.registerAddon(
-                    new ExampleAddonServer()
+                    new FireTorchAddonServer()
             );
         }else{
             VisorAPI.registerAddon(
-                    new ExampleAddonClient()
+                    new FireTorchAddonClient()
             );
         }
     }
