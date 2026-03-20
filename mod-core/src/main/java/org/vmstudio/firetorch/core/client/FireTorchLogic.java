@@ -10,6 +10,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -160,9 +161,24 @@ public class FireTorchLogic {
     }
 
     private static boolean isFlammable(BlockState state) {
-        return state.is(BlockTags.LOGS) || state.is(BlockTags.PLANKS) ||
-            state.is(BlockTags.LEAVES) || state.is(BlockTags.WOOL) ||
-            state.is(BlockTags.WOODEN_FENCES) || state.is(BlockTags.WOODEN_SLABS) ||
-            state.is(BlockTags.WOODEN_STAIRS);
+        if (state.ignitedByLava()) {
+            return true;
+        }
+//        if (state.is(BlockTags.INFINIBURN_OVERWORLD) || state.is(BlockTags.INFINIBURN_NETHER)) { // is it necessary?
+//            return true;
+//        }
+
+        return state.is(BlockTags.LOGS) ||
+            state.is(BlockTags.PLANKS) ||
+            state.is(BlockTags.LEAVES) ||
+            state.is(BlockTags.WOOL) ||
+            state.is(BlockTags.WOODEN_FENCES) ||
+            state.is(BlockTags.WOODEN_SLABS) ||
+            state.is(BlockTags.WOODEN_STAIRS) ||
+            state.is(BlockTags.WOODEN_DOORS) ||
+            state.is(BlockTags.WOODEN_TRAPDOORS) ||
+            state.is(Blocks.TNT) ||
+            state.is(Blocks.BOOKSHELF) ||
+            state.is(Blocks.HAY_BLOCK);
     }
 }
