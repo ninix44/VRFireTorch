@@ -12,6 +12,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseFireBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.TntBlock;
@@ -47,7 +48,7 @@ public class FireTorchMod implements ModInitializer {
                         boolean replaceInPlace = isReplaceableIgnitable(clickedState);
                         BlockPos firePos = replaceInPlace ? clickedPos : clickedPos.relative(face);
                         if ((level.getBlockState(firePos).isAir() || level.getBlockState(firePos).canBeReplaced())
-                            && BaseFireBlock.canBePlacedAt(level, firePos, replaceInPlace ? Direction.UP : face)) {
+                            && (replaceInPlace ? canReplaceIgnitableWithFire(level, firePos) : BaseFireBlock.canBePlacedAt(level, firePos, face))) {
                             level.setBlockAndUpdate(firePos, BaseFireBlock.getState(level, firePos));
                         }
                     }
@@ -109,5 +110,12 @@ public class FireTorchMod implements ModInitializer {
             || state.is(Blocks.LARGE_FERN)
             || state.is(Blocks.DEAD_BUSH)
             || state.is(BlockTags.SAPLINGS);
+    }
+
+    private static boolean canReplaceIgnitableWithFire(Level level, BlockPos pos) {
+        BlockPos belowPos = pos.below();
+        BlockState belowState = level.getBlockState(belowPos);
+        return belowState.isFaceSturdy(level, belowPos, Direction.UP)
+            || BaseFireBlock.canBePlacedAt(level, pos, Direction.UP);
     }
 }

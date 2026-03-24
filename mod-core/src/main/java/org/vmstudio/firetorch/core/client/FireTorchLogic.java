@@ -253,8 +253,11 @@ public class FireTorchLogic {
             return null;
         }
 
-        Direction supportFace = replaceInPlace ? Direction.UP : face;
-        if (!BaseFireBlock.canBePlacedAt(level, firePos, supportFace)) {
+        if (replaceInPlace) {
+            if (!canReplaceIgnitableWithFire(level, firePos)) {
+                return null;
+            }
+        } else if (!BaseFireBlock.canBePlacedAt(level, firePos, face)) {
             return null;
         }
 
@@ -268,6 +271,13 @@ public class FireTorchLogic {
             || state.is(Blocks.LARGE_FERN)
             || state.is(Blocks.DEAD_BUSH)
             || state.is(BlockTags.SAPLINGS);
+    }
+
+    private static boolean canReplaceIgnitableWithFire(Level level, BlockPos pos) {
+        BlockPos belowPos = pos.below();
+        BlockState belowState = level.getBlockState(belowPos);
+        return belowState.isFaceSturdy(level, belowPos, Direction.UP)
+            || BaseFireBlock.canBePlacedAt(level, pos, Direction.UP);
     }
 
     private static Direction getNearestFaceToBox(Vec3 tipVec, AABB box) {
