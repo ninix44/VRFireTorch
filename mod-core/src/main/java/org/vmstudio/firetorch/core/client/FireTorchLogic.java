@@ -43,9 +43,11 @@ public class FireTorchLogic {
     private static BlockPos offHandTarget = null;
 
     private static final int TARGET_IGNITE_TIME = 60;
-    private static final double MAX_TORCH_REACH = 0.18;
-    private static final double INTERACTION_BOX_INFLATE = 0.08;
-    private static final double MAX_BOX_DISTANCE = 0.05;
+    private static final double MAX_TORCH_REACH = 0.08;
+    private static final double INTERACTION_BOX_INFLATE = 0.015;
+    private static final double MAX_BOX_DISTANCE = 0.01;
+    private static final double REPLACEABLE_INTERACTION_BOX_INFLATE = 0.0;
+    private static final double REPLACEABLE_MAX_BOX_DISTANCE = 0.0;
 
     private record IgniteTarget(BlockPos clickedPos, Direction face, BlockPos firePos) { }
 
@@ -223,9 +225,9 @@ public class FireTorchLogic {
                         continue;
                     }
 
-                    AABB interactionBox = new AABB(candidate).inflate(0.10);
+                    AABB interactionBox = new AABB(candidate).inflate(REPLACEABLE_INTERACTION_BOX_INFLATE);
                     double distance = distanceToBox(tipVec, interactionBox);
-                    if (!interactionBox.contains(tipVec) && distance > 0.08) {
+                    if (!interactionBox.contains(tipVec) && distance > REPLACEABLE_MAX_BOX_DISTANCE) {
                         continue;
                     }
 
