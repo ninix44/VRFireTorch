@@ -9,9 +9,14 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.BaseFireBlock;
+import net.minecraft.world.level.block.TntBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -26,7 +31,7 @@ import org.vmstudio.visor.api.common.player.VRPose;
 public class FireTorchLogic {
 
     public interface NetworkBridge {
-        void sendIgniteEvent(BlockPos pos, boolean isMainHand);
+        void sendIgniteEvent(BlockPos clickedPos, Direction face, boolean isMainHand);
     }
 
     public static NetworkBridge bridge;
@@ -38,6 +43,11 @@ public class FireTorchLogic {
     private static BlockPos offHandTarget = null;
 
     private static final int TARGET_IGNITE_TIME = 60;
+    private static final double MAX_TORCH_REACH = 0.18;
+    private static final double INTERACTION_BOX_INFLATE = 0.08;
+    private static final double MAX_BOX_DISTANCE = 0.05;
+
+    private record IgniteTarget(BlockPos clickedPos, Direction face, BlockPos firePos) { }
 
     public static void tick() {
         Minecraft mc = Minecraft.getInstance();
@@ -60,11 +70,13 @@ public class FireTorchLogic {
             return;
         }
 
-        Vec3 torchPos = getTorchPos(pose);
+        Vec3 torchBasePos = getTorchBasePos(pose);
+        Vec3 torchPos = getTorchTipPos(pose);
 
-        BlockPos targetPos = getFireTarget(mc.level, torchPos);
+        IgniteTarget target = getIgniteTarget(mc, torchBasePos, torchPos);
 
-        if (targetPos != null) {
+        if (target != null) {
+            BlockPos targetPos = target.firePos();
             BlockPos lastTarget = isMain ? mainHandTarget : offHandTarget;
 
             if (targetPos.equals(lastTarget)) {
@@ -95,7 +107,7 @@ public class FireTorchLogic {
                             0, 0.05, 0);
                     }
 
-                    if (bridge != null) bridge.sendIgniteEvent(targetPos, isMain);
+                    if (bridge != null) bridge.sendIgniteEvent(target.clickedPos(), target.face(), isMain);
                     resetTimers(isMain);
                 }
             } else {
@@ -122,63 +134,192 @@ public class FireTorchLogic {
         }
     }
 
-    private static Vec3 getTorchPos(VRPose handPose) {
+    private static Vec3 getTorchBasePos(VRPose handPose) {
+        Vector3f offset = new Vector3f(0, 0.08f, 0.02f);
+        Vector3f baseJoml = handPose.getCustomVector(offset).add(handPose.getPosition());
+        return new Vec3(baseJoml.x(), baseJoml.y(), baseJoml.z());
+    }
+
+    private static Vec3 getTorchTipPos(VRPose handPose) {
         Vector3f offset = new Vector3f(0, 0.2f, -0.1f);
         Vector3f tipJoml = handPose.getCustomVector(offset).add(handPose.getPosition());
         return new Vec3(tipJoml.x(), tipJoml.y(), tipJoml.z());
     }
 
-    private static BlockPos getFireTarget(Level level, Vec3 tipVec) {
-        BlockPos tipPos = BlockPos.containing(tipVec.x, tipVec.y, tipVec.z);
-        BlockState state = level.getBlockState(tipPos);
+    private static IgniteTarget getIgniteTarget(Minecraft mc, Vec3 baseVec, Vec3 tipVec) {
+        Level level = mc.level;
+        if (level == null || mc.player == null) {
+            return null;
+        }
 
-        if (isFlammable(state)) {
-            for (Direction dir : Direction.values()) {
-                BlockPos adj = tipPos.relative(dir);
-                if (level.getBlockState(adj).isAir() || level.getBlockState(adj).canBeReplaced()) {
-                    return adj;
-                }
+        IgniteTarget replaceableTarget = getReplaceableIgniteTarget(level, tipVec);
+        if (replaceableTarget != null) {
+            return replaceableTarget;
+        }
+
+        Vec3 rayDir = tipVec.subtract(baseVec);
+        if (rayDir.lengthSqr() < 1.0E-6) {
+            return null;
+        }
+
+        Vec3 rayEnd = tipVec.add(rayDir.normalize().scale(MAX_TORCH_REACH));
+        BlockHitResult hitResult = level.clip(new ClipContext(baseVec, rayEnd, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player));
+        if (hitResult.getType() == HitResult.Type.BLOCK) {
+            IgniteTarget clippedTarget = createIgniteTarget(level, hitResult.getBlockPos(), hitResult.getDirection());
+            if (clippedTarget != null) {
+                return clippedTarget;
             }
         }
-        else if (state.isAir() || state.canBeReplaced()) {
-            for (Direction dir : Direction.values()) {
-                BlockPos adj = tipPos.relative(dir);
-                BlockState adjState = level.getBlockState(adj);
 
-                if (isFlammable(adjState)) {
-                    VoxelShape shape = adjState.getShape(level, adj);
-                    if (!shape.isEmpty()) {
-                        AABB expandedHitbox = shape.bounds().move(adj).inflate(0.15);
+        BlockPos centerPos = BlockPos.containing(tipVec.x, tipVec.y, tipVec.z);
+        IgniteTarget bestTarget = null;
+        double bestDistance = Double.MAX_VALUE;
 
-                        if (expandedHitbox.contains(tipVec)) {
-                            return tipPos;
-                        }
+        for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int z = -1; z <= 1; z++) {
+                    BlockPos candidate = centerPos.offset(x, y, z);
+                    BlockState state = level.getBlockState(candidate);
+                    if (state.isAir() || !isTorchIgnitable(state)) {
+                        continue;
+                    }
+
+                    VoxelShape shape = state.getShape(level, candidate);
+                    AABB bounds = shape.isEmpty() ? new AABB(candidate) : shape.bounds().move(candidate);
+                    AABB interactionBox = bounds.inflate(INTERACTION_BOX_INFLATE);
+                    if (!interactionBox.contains(tipVec) && distanceToBox(tipVec, interactionBox) > MAX_BOX_DISTANCE) {
+                        continue;
+                    }
+
+                    Direction face = getNearestFaceToBox(tipVec, bounds);
+                    IgniteTarget candidateTarget = createIgniteTarget(level, candidate, face);
+                    if (candidateTarget == null) {
+                        continue;
+                    }
+
+                    double distance = distanceToBox(tipVec, bounds);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestTarget = candidateTarget;
                     }
                 }
             }
         }
-        return null;
+
+        return bestTarget;
     }
 
-    private static boolean isFlammable(BlockState state) {
-        if (state.ignitedByLava()) {
-            return true;
-        }
-//        if (state.is(BlockTags.INFINIBURN_OVERWORLD) || state.is(BlockTags.INFINIBURN_NETHER)) { // is it necessary?
-//            return true;
-//        }
+    private static IgniteTarget getReplaceableIgniteTarget(Level level, Vec3 tipVec) {
+        BlockPos centerPos = BlockPos.containing(tipVec.x, tipVec.y, tipVec.z);
+        IgniteTarget bestTarget = null;
+        double bestDistance = Double.MAX_VALUE;
 
-        return state.is(BlockTags.LOGS) ||
-            state.is(BlockTags.PLANKS) ||
-            state.is(BlockTags.LEAVES) ||
-            state.is(BlockTags.WOOL) ||
-            state.is(BlockTags.WOODEN_FENCES) ||
-            state.is(BlockTags.WOODEN_SLABS) ||
-            state.is(BlockTags.WOODEN_STAIRS) ||
-            state.is(BlockTags.WOODEN_DOORS) ||
-            state.is(BlockTags.WOODEN_TRAPDOORS) ||
-            state.is(Blocks.TNT) ||
-            state.is(Blocks.BOOKSHELF) ||
-            state.is(Blocks.HAY_BLOCK);
+        for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int z = -1; z <= 1; z++) {
+                    BlockPos candidate = centerPos.offset(x, y, z);
+                    BlockState state = level.getBlockState(candidate);
+                    if (!isReplaceableIgnitable(state)) {
+                        continue;
+                    }
+
+                    AABB interactionBox = new AABB(candidate).inflate(0.10);
+                    double distance = distanceToBox(tipVec, interactionBox);
+                    if (!interactionBox.contains(tipVec) && distance > 0.08) {
+                        continue;
+                    }
+
+                    IgniteTarget candidateTarget = createIgniteTarget(level, candidate, Direction.UP);
+                    if (candidateTarget != null && distance < bestDistance) {
+                        bestDistance = distance;
+                        bestTarget = candidateTarget;
+                    }
+                }
+            }
+        }
+
+        return bestTarget;
+    }
+
+    private static IgniteTarget createIgniteTarget(Level level, BlockPos clickedPos, Direction face) {
+        BlockState state = level.getBlockState(clickedPos);
+        if (state.isAir() || !isTorchIgnitable(state)) {
+            return null;
+        }
+
+        boolean replaceInPlace = isReplaceableIgnitable(state);
+        BlockPos firePos = replaceInPlace ? clickedPos : clickedPos.relative(face);
+        if (!(level.getBlockState(firePos).isAir() || level.getBlockState(firePos).canBeReplaced())) {
+            return null;
+        }
+
+        Direction supportFace = replaceInPlace ? Direction.UP : face;
+        if (!BaseFireBlock.canBePlacedAt(level, firePos, supportFace)) {
+            return null;
+        }
+
+        return new IgniteTarget(clickedPos, face, firePos);
+    }
+
+    private static boolean isReplaceableIgnitable(BlockState state) {
+        return state.is(Blocks.GRASS)
+            || state.is(Blocks.TALL_GRASS)
+            || state.is(Blocks.FERN)
+            || state.is(Blocks.LARGE_FERN)
+            || state.is(Blocks.DEAD_BUSH)
+            || state.is(BlockTags.SAPLINGS);
+    }
+
+    private static Direction getNearestFaceToBox(Vec3 tipVec, AABB box) {
+        double west = Math.abs(tipVec.x - box.minX);
+        double east = Math.abs(box.maxX - tipVec.x);
+        double down = Math.abs(tipVec.y - box.minY);
+        double up = Math.abs(box.maxY - tipVec.y);
+        double north = Math.abs(tipVec.z - box.minZ);
+        double south = Math.abs(box.maxZ - tipVec.z);
+
+        Direction closest = Direction.UP;
+        double best = up;
+
+        if (down < best) {best = down; closest = Direction.DOWN; }
+        if (north < best) { best = north; closest = Direction.NORTH; }
+        if (south < best) { best = south; closest = Direction.SOUTH; }
+        if (west < best) { best = west; closest = Direction.WEST; }
+        if (east < best) { closest = Direction.EAST; }
+
+        return closest;
+    }
+
+    private static boolean isTorchIgnitable(BlockState state) {
+        return state.is(Blocks.TNT)
+            || state.is(Blocks.CRAFTING_TABLE)
+            || state.is(Blocks.LECTERN)
+            || state.is(Blocks.GRASS)
+            || state.is(Blocks.TALL_GRASS)
+            || state.is(Blocks.FERN)
+            || state.is(Blocks.LARGE_FERN)
+            || state.is(Blocks.DEAD_BUSH)
+            || state.is(BlockTags.SAPLINGS)
+            || state.is(BlockTags.LOGS)
+            || state.is(BlockTags.PLANKS)
+            || state.is(BlockTags.LEAVES)
+            || state.is(BlockTags.WOOL)
+            || state.is(BlockTags.WOODEN_FENCES)
+            || state.is(BlockTags.WOODEN_SLABS)
+            || state.is(BlockTags.WOODEN_STAIRS)
+            || state.is(BlockTags.WOODEN_DOORS)
+            || state.is(BlockTags.WOODEN_TRAPDOORS)
+            || state.is(BlockTags.WOODEN_BUTTONS)
+            || state.is(BlockTags.WOODEN_PRESSURE_PLATES)
+            || state.is(Blocks.BOOKSHELF)
+            || state.is(Blocks.HAY_BLOCK)
+            || state.getBlock() instanceof TntBlock;
+    }
+
+    private static double distanceToBox(Vec3 point, AABB box) {
+        double dx = Math.max(Math.max(box.minX - point.x, 0.0), point.x - box.maxX);
+        double dy = Math.max(Math.max(box.minY - point.y, 0.0), point.y - box.maxY);
+        double dz = Math.max(Math.max(box.minZ - point.z, 0.0), point.z - box.maxZ);
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 }
