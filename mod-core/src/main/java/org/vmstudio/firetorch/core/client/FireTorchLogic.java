@@ -25,10 +25,17 @@ import org.vmstudio.visor.api.VisorAPI;
 import org.vmstudio.visor.api.client.player.VRLocalPlayer;
 import org.vmstudio.visor.api.client.player.pose.PlayerPoseClient;
 import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
+import org.vmstudio.visor.api.client.gui.overlays.VROverlay;
 import org.vmstudio.visor.api.common.HandType;
 import org.vmstudio.visor.api.common.player.VRPose;
 
 public class FireTorchLogic {
+    private static final String OVERLAY_HOTBAR_MAIN = "hotbar_mainhand";
+    private static final String OVERLAY_HOTBAR_OFF = "hotbar_offhand";
+    private static final String OVERLAY_GAME_SCREEN = "game_screen";
+    private static final String OVERLAY_KEYBOARD = "keyboard";
+    private static final String OVERLAY_SETTINGS = "settings";
+    private static final String OVERLAY_OPTIONS_MENU = "options_menu";
 
     public interface NetworkBridge {
         void sendIgniteEvent(BlockPos clickedPos, Direction face, boolean isMainHand);
@@ -54,6 +61,11 @@ public class FireTorchLogic {
     public static void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || mc.isPaused()) return;
+        if (isGuiInteractionBlocked(mc)) {
+            resetTimers(true);
+            resetTimers(false);
+            return;
+        }
 
         VRLocalPlayer vrPlayer = VisorAPI.client().getVRLocalPlayer();
         if (vrPlayer == null || !VisorAPI.clientState().playMode().canPlayVR()) return;
@@ -333,5 +345,27 @@ public class FireTorchLogic {
         double dy = Math.max(Math.max(box.minY - point.y, 0.0), point.y - box.maxY);
         double dz = Math.max(Math.max(box.minZ - point.z, 0.0), point.z - box.maxZ);
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    private static boolean isGuiInteractionBlocked(Minecraft mc) {
+        if (mc.screen != null) {
+            return true;
+        }
+
+        var guiManager = VisorAPI.client().getGuiManager();
+        if (guiManager.getCursorHandler().isAnyHandFocused()) {
+            return true;
+        }
+
+        return isOverlayVisible(guiManager.getOverlayManager().getOverlay(OVERLAY_HOTBAR_MAIN))
+            || isOverlayVisible(guiManager.getOverlayManager().getOverlay(OVERLAY_HOTBAR_OFF))
+            || isOverlayVisible(guiManager.getOverlayManager().getOverlay(OVERLAY_GAME_SCREEN))
+            || isOverlayVisible(guiManager.getOverlayManager().getOverlay(OVERLAY_KEYBOARD))
+            || isOverlayVisible(guiManager.getOverlayManager().getOverlay(OVERLAY_SETTINGS))
+            || isOverlayVisible(guiManager.getOverlayManager().getOverlay(OVERLAY_OPTIONS_MENU));
+    }
+
+    private static boolean isOverlayVisible(VROverlay overlay) {
+        return overlay != null && overlay.isVisible();
     }
 }
